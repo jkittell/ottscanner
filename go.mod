@@ -1,4 +1,4 @@
-module ottscanner
+module github.com/jkittell/ottscanner
 
 go 1.20
 
