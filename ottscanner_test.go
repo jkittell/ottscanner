@@ -1,8 +1,6 @@
 package ottscanner
 
 import (
-	"fmt"
-	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"github.com/jkittell/toolbox"
 	"os"
@@ -49,7 +47,9 @@ func TestScanner_Streams(t *testing.T) {
 		}
 
 		for _, stream := range streams {
-			fmt.Println(stream.name)
+			if stream.name == "" {
+				t.FailNow()
+			}
 		}
 	}
 }
@@ -85,23 +85,11 @@ func TestScanner_Scan(t *testing.T) {
 		if len(scans) == 0 {
 			t.Fatal("no segments scanned")
 		}
-		var errorFound bool
-		for segment, ok := range scans {
-			var v string
-			if ok {
-				v = "OK"
-				// ()
-				fmt.Println(segment.URL(), "...", color.GreenString(v))
-			} else {
-				errorFound = true
-				v = "ERR"
-				fmt.Println(segment.URL(), "...", color.RedString(v))
+
+		for _, ok := range scans {
+			if !ok {
+				t.FailNow()
 			}
-		}
-		if errorFound {
-			fmt.Println(url, color.RedString("IS NOT OK"))
-		} else {
-			fmt.Println(url, color.GreenString("IS OK"))
 		}
 	}
 }

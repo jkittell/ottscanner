@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jkittell/toolbox"
-	"github.com/schollz/progressbar/v3"
 	"golang.org/x/sync/semaphore"
 	"os"
 	"path"
@@ -14,7 +13,7 @@ import (
 	"sync"
 )
 
-var logger = NewTestingLogger(true)
+var logger = NewTestingLogger(false)
 
 type ContentFormat byte
 
@@ -58,7 +57,7 @@ type Stream struct {
 	segments          Segments
 }
 
-type scanner struct {
+type Scanner struct {
 	url            string
 	format         ContentFormat
 	streams        Streams
@@ -98,19 +97,19 @@ func (s *Stream) Name() string {
 
 // Files returns a map of stream name and the corresponding
 // segment file locations for that steam.
-func (s *scanner) Files() map[string][]SegmentDownload {
+func (s *Scanner) Files() map[string][]SegmentDownload {
 	return s.files
 }
 
 // addFile checks if the file is already in the slice of
 // files for the streams and if not adds it to the slice of
 // file locations for the stream.
-func (s *scanner) addFile(streamName string, download SegmentDownload) {
+func (s *Scanner) addFile(streamName string, download SegmentDownload) {
 	s.files[streamName] = append(s.files[streamName], download)
 }
 
 // parse collects the ABR streams and segments from the playlist/manifest
-func (s *scanner) parse() (Streams, error) {
+func (s *Scanner) parse() (Streams, error) {
 	var streams Streams
 	if s.format == HLS {
 		return parseHLS(s.url)
@@ -124,7 +123,7 @@ func (s *scanner) parse() (Streams, error) {
 
 // TODO
 // Random downloads segments randomly
-func (s *scanner) Random() error {
+func (s *Scanner) Random() error {
 	// TODO
 	return newScannerError(errors.New("not yet implemented"), "go away")
 }
@@ -132,7 +131,7 @@ func (s *scanner) Random() error {
 // TODO
 // EmulatePlayback will select a stream then download segments
 // in a buffer from the live edge.
-func (s *scanner) EmulatePlayback() error {
+func (s *Scanner) EmulatePlayback() error {
 	// TODO
 	return newScannerError(errors.New("not yet implemented"), "go away")
 }
@@ -160,7 +159,7 @@ func downloader(done chan bool, results map[string][]SegmentDownload, directory 
 	if numberOfSegments == 0 {
 		panic(newScannerError(errors.New("no segments to download"), str.name))
 	}
-	bar := progressbar.New(numberOfSegments)
+
 	logger.Debugf("\ndownloading %d segments for stream: %s\n", numberOfSegments, str.name)
 	// loop through the segments decoded from the playlist
 	for _, segment := range str.segments {
@@ -194,12 +193,10 @@ func downloader(done chan bool, results map[string][]SegmentDownload, directory 
 				mutex.Unlock()
 			}
 			sem.Release(1)
-			bar.Add(1)
 		}(segment)
 	}
 	wg.Wait()
 	done <- true
-	fmt.Println()
 }
 
 func downloadDASHSegments(directory, manifestURL string, streams Streams, maxConcurrency int64) (map[string][]SegmentDownload, error) {
@@ -275,8 +272,7 @@ func downloadHLSSegments(directory string, streams Streams, maxConcurrency int64
 // Download downloads the segments and stores the ABR stream names
 // and their corresponding segments. Retrieve the stream names and the
 // downloaded file locations by calling scanner.Files().
-func (s *scanner) Download(directory string, maxConcurrency int64) error {
-	fmt.Println("downloading segments for playlist: ", s.url)
+func (s *Scanner) Download(directory string, maxConcurrency int64) error {
 	streams, err := s.Streams()
 	if err != nil {
 		return newScannerError(err, fmt.Sprintf("error getting streams for download: %s", s.url))
@@ -308,7 +304,7 @@ func (s *scanner) Download(directory string, maxConcurrency int64) error {
 
 // Scan will do a head request on each segment and verify 200 response code
 // and return a map of the segment scanned and if it was scanned successfully.
-func (s *scanner) Scan() (map[Segment]bool, error) {
+func (s *Scanner) Scan() (map[Segment]bool, error) {
 	results := make(map[Segment]bool)
 	segments, err := s.Segments()
 	if err != nil || len(segments) == 0 {
@@ -353,7 +349,7 @@ func (s *scanner) Scan() (map[Segment]bool, error) {
 }
 
 // Segments returns a slice of segment urls
-func (s *scanner) Segments() (Segments, error) {
+func (s *Scanner) Segments() (Segments, error) {
 	var segments Segments
 	streams, err := s.Streams()
 	if err != nil {
@@ -381,7 +377,7 @@ func (s *scanner) Segments() (Segments, error) {
 }
 
 // Streams returns a map of stream name and url
-func (s *scanner) Streams() (Streams, error) {
+func (s *Scanner) Streams() (Streams, error) {
 	logger.Debugf("checking url: %s", s.url)
 	_, err := toolbox.SendRequest(toolbox.HEAD, s.url, "", nil)
 	if err != nil {
@@ -408,20 +404,19 @@ func (s *scanner) Streams() (Streams, error) {
 	}
 }
 
-func New(url string, maxConcurrency int64) (*scanner, error) {
+func New(url string, maxConcurrency int64) (*Scanner, error) {
 	var format ContentFormat
 	if strings.Contains(url, ".m3u8") {
 		format = HLS
 	} else if strings.Contains(url, ".mpd") {
 		format = DASH
 	} else {
-		fmt.Println()
 		return nil, newScannerError(errors.New("cannot determine if this url is hls or dash"), url)
 	}
 	if maxConcurrency < 1 {
 		maxConcurrency = 1
 	}
-	scanner := &scanner{
+	scanner := &Scanner{
 		url:            url,
 		format:         format,
 		streams:        Streams{},
