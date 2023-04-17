@@ -1,6 +1,7 @@
 package ottscanner
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/jkittell/toolbox"
 	"os"
@@ -86,8 +87,9 @@ func TestScanner_Scan(t *testing.T) {
 			t.Fatal("no segments scanned")
 		}
 
-		for _, ok := range scans {
+		for segment, ok := range scans {
 			if !ok {
+				fmt.Println(segment.Name(), "FAIL")
 				t.FailNow()
 			}
 		}
@@ -113,7 +115,8 @@ func TestScanner_Download(t *testing.T) {
 			}
 			for _, f := range files {
 				if !toolbox.FileExists(f.File()) {
-					t.Fatal(f)
+					fmt.Println(f.File())
+					t.Fatal(f.File())
 				}
 			}
 		}

@@ -26,10 +26,17 @@ func decodeVariant(url string) (Segments, error) {
 	// store byte range then continue to next line for Segment
 	var byteRangeStart int
 	var byteRangeSize int
+
+	// Detect GAP tag and skip adding segments that are missing
+	var gapSegment bool
+
 	segmentFormats := []string{".ts", ".fmp4", ".cmfv", ".cmfa", ".aac", ".ac3", ".ec3", ".webvtt"}
 	scanner := bufio.NewScanner(bytes.NewReader(playlist))
 	for scanner.Scan() {
 		line := scanner.Text()
+		if strings.HasPrefix(line, "#EXT-X-GAP") {
+			gapSegment = true
+		}
 		if strings.Contains(line, "#EXT-X-BYTERANGE") {
 			// #EXT-X-BYTERANGE:44744@2304880
 			// -H "Range: bytes=0-1023"
@@ -63,6 +70,10 @@ func decodeVariant(url string) (Segments, error) {
 			if strings.Contains(line, format) {
 				match = true
 				if match {
+					if gapSegment {
+						gapSegment = false
+						continue
+					}
 					if strings.Contains(line, "#EXT-X-MAP:URI=") {
 						re := regexp.MustCompile(`"[^"]+"`)
 						initSegment := re.FindString(line)
